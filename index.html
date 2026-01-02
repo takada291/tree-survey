@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>tree-survey</title>
+    <style>
+        /* iPhone向けの最適化設定 */
+        body { font-family: -apple-system, sans-serif; padding: 15px; background: #f0f2f5; color: #333; margin: 0; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; font-size: 1.1em; color: #2c3e50; border-bottom: 2px solid #28a745; padding-bottom: 5px; }
+        
+        label { display: block; margin-top: 10px; font-size: 0.85em; font-weight: bold; }
+        input, select { 
+            display: block; width: 100%; padding: 12px; margin: 5px 0 12px 0; 
+            border: 1px solid #ccc; border-radius: 6px; font-size: 16px; 
+            box-sizing: border-box; -webkit-appearance: none; background-color: white;
+        }
+        
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        button { 
+            flex: 1; min-width: 80px; padding: 14px; font-size: 15px; border: none; 
+            border-radius: 6px; cursor: pointer; color: white; font-weight: bold; 
+        }
+        .save-btn { background: #007bff; }
+        .update-mode { background: #fd7e14; }
+        .export-btn { background: #28a745; }
+        .cancel-btn { background: #6c757d; display: none; }
+        
+        .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; min-width: 600px; }
+        th, td { border: 1px solid #ddd; padding: 8px 4px; text-align: center; }
+        th { background: #e9ecef; }
+        
+        .action-btns { display: flex; gap: 4px; justify-content: center; }
+        .edit-btn { background: #ffc107; color: #212529; padding: 6px; width: 45px; border-radius: 4px; font-size: 11px; flex: none; }
+        .del-btn { background: #dc3545; color: white; padding: 6px; width: 45px; border-radius: 4px; font-size: 11px; flex: none; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2 id="formTitle">データ入力</h2>
+    <input type="hidden" id="editId" value="">
+    
+    <label>プロット番号</label>
+    <input type="number" id="plotNo" inputmode="numeric">
+    
+    <label>立木番号</label>
+    <input type="number" id="treeNo" inputmode="numeric">
+    
+    <label>樹種</label>
+    <select id="treeType">
+        <option value="スギ">スギ</option>
+        <option value="ヒノキ">ヒノキ</option>
+        <option value="他針">他針</option>
+        <option value="他広">他広</option>
+    </select>
+    
+    <label>胸高直径 (cm)</label>
+    <input type="number" step="0.1" id="dbh" inputmode="decimal">
+    
+    <label>樹高 (m)</label>
+    <input type="number" step="0.1" id="height" inputmode="decimal">
+
+    <label>材質</label>
+    <select id="quality">
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+    </select>
+
+    <label>備考</label>
+    <input type="text" id="memo">
+    
+    <div class="btn-group">
+        <button id="saveBtn" class="save-btn" onclick="handleSave()">保存</button>
+        <button id="cancelBtn" class="cancel-btn" onclick="resetForm()">取消</button>
+        <button class="export-btn" onclick="handleExport()">CSV出力</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>登録済みデータ</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>P番号</th>
+                    <th>立木番号</th>
+                    <th>樹種</th>
+                    <th>直径</th>
+                    <th>樹高</th>
+                    <th>材質</th>
+                    <th>備考</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    <script>
+    // --- 追加：PWA登録用 ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js');
+        });
+    }
+    // ----------------------
+    var STORAGE_KEY = 'forest_survey_final_v3';
+    // キー名を更新してクリーンな状態で開始
+    var STORAGE_KEY = 'forest_survey_final_v3';
+
+    // 画面起動時
+    window.onload = function() {
+        renderTable();
+    };
+
+    // 保存・更新処理
+    function handleSave() {
+        var p = document.getElementById('plotNo').value;
+        var t = document.getElementById('treeNo').value;
+        var d = document.getElementById('dbh').value;
+        var editId = document.getElementById('editId').value;
+
+        if(!p || !t || !d) {
+            alert("必須項目（プロット・立木番号・直径）を入力してください");
+            return;
+        }
+
+        var list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        
+        var record = {
+            plotNo: p,
+            treeNo: t,
+            treeType: document.getElementById('treeType').value,
+            dbh: d,
+            height: document.getElementById('height').value,
+            quality: document.getElementById('quality').value,
+            memo: document.getElementById('memo').value,
+            id: editId ? editId : String(new Date().getTime()) // IDは常に文字列
+        };
+
+        if (editId) {
+            // 修正
+            for(var i=0; i<list.length; i++) {
+                if(String(list[i].id) === String(editId)) {
+                    list[i] = record;
+                    break;
+                }
+            }
+        } else {
+            // 新規
+            list.unshift(record);
+        }
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        resetForm();
+        renderTable();
+    }
+
+    // テーブル表示
+    function renderTable() {
+        var list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        var tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        for(var i=0; i<list.length; i++) {
+            var item = list[i];
+            var row = document.createElement('tr');
+            
+            // 安全のための初期値設定
+            var q = item.quality ? item.quality : 'A';
+            var m = item.memo ? item.memo : '';
+            var sid = String(item.id);
+
+            row.innerHTML = 
+                '<td>' + item.plotNo + '</td>' +
+                '<td>' + item.treeNo + '</td>' +
+                '<td>' + item.treeType + '</td>' +
+                '<td>' + item.dbh + '</td>' +
+                '<td>' + item.height + '</td>' +
+                '<td>' + q + '</td>' +
+                '<td>' + m + '</td>' +
+                '<td class="action-btns">' +
+                    '<button class="edit-btn" onclick="startEdit(\'' + sid + '\')">修正</button>' +
+                    '<button class="del-btn" onclick="handleDelete(\'' + sid + '\')">削除</button>' +
+                '</td>';
+            tbody.appendChild(row);
+        }
+    }
+
+    // 修正モード開始
+    function startEdit(targetId) {
+        var list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        var target = null;
+        for(var i=0; i<list.length; i++) {
+            if(String(list[i].id) === String(targetId)) {
+                target = list[i];
+                break;
+            }
+        }
+
+        if(target) {
+            document.getElementById('editId').value = target.id;
+            document.getElementById('plotNo').value = target.plotNo;
+            document.getElementById('treeNo').value = target.treeNo;
+            document.getElementById('treeType').value = target.treeType;
+            document.getElementById('dbh').value = target.dbh;
+            document.getElementById('height').value = target.height;
+            document.getElementById('quality').value = target.quality || 'A';
+            document.getElementById('memo').value = target.memo || '';
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('formTitle').innerText = "【修正中】";
+            document.getElementById('saveBtn').innerText = "更新";
+            document.getElementById('saveBtn').className = "save-btn update-mode";
+            document.getElementById('cancelBtn').style.display = "inline-block";
+        }
+    }
+
+    // 削除処理
+    function handleDelete(targetId) {
+        if(!confirm("削除しますか？")) return;
+        var list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        var newList = [];
+        for(var i=0; i<list.length; i++) {
+            if(String(list[i].id) !== String(targetId)) {
+                newList.push(list[i]);
+            }
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+        renderTable();
+    }
+
+    // フォームリセット
+    function resetForm() {
+        document.getElementById('editId').value = "";
+        document.getElementById('treeNo').value = "";
+        document.getElementById('dbh').value = "";
+        document.getElementById('height').value = "";
+        document.getElementById('memo').value = "";
+        document.getElementById('formTitle').innerText = "データ入力";
+        document.getElementById('saveBtn').innerText = "保存";
+        document.getElementById('saveBtn').className = "save-btn";
+        document.getElementById('cancelBtn').style.display = "none";
+    }
+
+    // CSV出力
+    function handleExport() {
+        var list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        if(list.length === 0) { alert("データがありません"); return; }
+
+        var loc = prompt("調査箇所を入力", "調査地〇△□");
+        if(!loc) return;
+
+        var csv = "\ufeffプロット番号,立木番号,樹種,胸高直径(cm),樹高(m),材質,備考\n";
+        for(var i=0; i<list.length; i++) {
+            var item = list[i];
+            var q = item.quality ? item.quality : 'A';
+            var m = (item.memo || "").replace(/,/g, " ");
+            csv += item.plotNo + "," + item.treeNo + "," + item.treeType + "," + item.dbh + "," + item.height + "," + q + "," + m + "\n";
+        }
+
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        
+        // --- 日付のフォーマット修正 ---
+        var now = new Date();
+        var yyyy = now.getFullYear();
+        var mm = String(now.getMonth() + 1).padStart(2, '0'); // 2桁に固定
+        var dd = String(now.getDate()).padStart(2, '0');    // 2桁に固定
+        var filename = "森林調査_" + loc + "_" + yyyy + mm + dd + ".csv";
+        // ------------------------------
+        
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 300);
+    }
+</script>
+
+</body>
+</html>

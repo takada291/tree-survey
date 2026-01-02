@@ -1,0 +1,9 @@
+{
+  "name": "森林調査ツール",
+  "short_name": "森林調査",
+  "start_url": "index.html",
+  "display": "standalone",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}
