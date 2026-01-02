@@ -119,8 +119,9 @@
         renderTable();
     };
 
-    // 保存・更新処理
-    function handleSave() {
+    // 保存・更新処理の強化版
+function handleSave() {
+    try {
         var p = document.getElementById('plotNo').value;
         var t = document.getElementById('treeNo').value;
         var d = document.getElementById('dbh').value;
@@ -131,7 +132,15 @@
             return;
         }
 
-        var list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // データの取得を確実に行う
+        var list = [];
+        try {
+            var storedData = localStorage.getItem(STORAGE_KEY);
+            list = storedData ? JSON.parse(storedData) : [];
+        } catch (e) {
+            console.error("データ読み込みエラー:", e);
+            list = [];
+        }
         
         var record = {
             plotNo: p,
@@ -141,26 +150,35 @@
             height: document.getElementById('height').value,
             quality: document.getElementById('quality').value,
             memo: document.getElementById('memo').value,
-            id: editId ? editId : String(new Date().getTime()) // IDは常に文字列
+            id: editId ? editId : String(Date.now()) // IDの生成をより確実に
         };
 
         if (editId) {
-            // 修正
-            for(var i=0; i<list.length; i++) {
-                if(String(list[i].id) === String(editId)) {
-                    list[i] = record;
-                    break;
-                }
+            // 更新処理
+            var index = list.findIndex(item => String(item.id) === String(editId));
+            if (index !== -1) {
+                list[index] = record;
+            } else {
+                list.unshift(record); // 万が一見つからない場合は新規追加
             }
         } else {
-            // 新規
+            // 新規追加
             list.unshift(record);
         }
 
+        // 保存の実行
         localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        
+        console.log("保存成功:", record);
         resetForm();
         renderTable();
+        alert("データを保存しました");
+
+    } catch (err) {
+        console.error("保存失敗:", err);
+        alert("保存中にエラーが発生しました: " + err.message);
     }
+}
 
     // テーブル表示
     function renderTable() {
@@ -290,4 +308,5 @@
 </script>
 
 </body>
+
 </html>
