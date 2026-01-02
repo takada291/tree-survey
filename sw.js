@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tree-survey-v1';
+const CACHE_NAME = 'tree-survey-v2';
 const urlsToCache = [
   './',
   'index.html',
@@ -14,4 +14,5 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(caches.match(event.request).then((res) => res || fetch(event.request)));
+
 });
