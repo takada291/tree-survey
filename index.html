@@ -47,7 +47,7 @@
 <body>
 
 <div class="card">
-    <h2 id="formTitle">立木調査v1.1　データ入力</h2>
+    <h2 id="formTitle">立木調査v1.5　データ入力</h2>
     <input type="hidden" id="editId" value="">
     
     <label>プロット番号</label><input type="number" id="plotNo" inputmode="numeric">
@@ -88,13 +88,41 @@
 </div>
 
 <script>
-    // PWA登録
+    // --- PWA登録 & 更新通知ロジック ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
+            navigator.serviceWorker.register('./sw.js').then(reg => {
+                // 新しいService Workerのインストールを監視
+                reg.onupdatefound = () => {
+                    const installingWorker = reg.installing;
+                    installingWorker.onstatechange = () => {
+                        if (installingWorker.state === 'installed') {
+                            if (navigator.serviceWorker.controller) {
+                                // 更新がある場合に確認ダイアログを表示
+                                if (confirm("最新バージョンがあります。更新しますか？\n（更新前にCSV出力を行ってください）")) {
+                                    // sw.jsにSKIP_WAITINGを送り、即座に有効化
+                                    if (reg.waiting) {
+                                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                                    }
+                                    window.location.reload();
+                                }
+                            }
+                        }
+                    };
+                };
+            }).catch(err => console.error('PWA登録失敗', err));
+        });
+
+        // サービスワーカーが切り替わった時にページをリロードして反映
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            window.location.reload();
+            refreshing = true;
         });
     }
 
+    // --- メイン処理 ---
     var STORAGE_KEY = 'forest_survey_final_v3';
 
     window.onload = function() { renderTable(); };
@@ -172,7 +200,6 @@
         renderTable();
     }
 
-    // 全データ消去処理
     function handleAllClear() {
         if(!confirm("保存されている全てのデータを消去しますか？\n（消去後は元に戻せません）")) return;
         localStorage.removeItem(STORAGE_KEY);
@@ -186,7 +213,7 @@
         document.getElementById('dbh').value = "";
         document.getElementById('height').value = "";
         document.getElementById('memo').value = "";
-        document.getElementById('formTitle').innerText = "データ入力";
+        document.getElementById('formTitle').innerText = "立木調査v1.1　データ入力";
         document.getElementById('saveBtn').innerText = "保存";
         document.getElementById('cancelBtn').style.display = "none";
     }
@@ -204,7 +231,6 @@
         var url = window.URL.createObjectURL(blob);
         var a = document.createElement("a");
 
-        // 日付（年月日）の取得
         var now = new Date();
         var yyyy = now.getFullYear();
         var mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -212,7 +238,7 @@
         var dateStr = yyyy + mm + dd;
 
         a.href = url;
-        a.download = "森林調査_" + dateStr + ".csv";
+        a.download = "立木調査_" + dateStr + ".csv";
         a.click();
         
         setTimeout(() => window.URL.revokeObjectURL(url), 100);
@@ -220,5 +246,3 @@
 </script>
 </body>
 </html>
-
-
