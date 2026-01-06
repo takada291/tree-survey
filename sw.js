@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tree-survey-final-v1'; // 名前を一新
+const CACHE_NAME = 'tree-survey-final-v1.5'; // バージョンを上げて更新を通知
 const urlsToCache = [
   './',
   'index.html',
@@ -10,7 +10,6 @@ const urlsToCache = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // 一つずつキャッシュして、失敗したファイルがわかるようにする
       return Promise.all(
         urlsToCache.map((url) => {
           return cache.add(url).catch(err => console.error('キャッシュ失敗:', url));
@@ -19,6 +18,29 @@ self.addEventListener('install', (event) => {
     })
   );
   self.skipWaiting();
+});
+
+// HTML側から「SKIP_WAITING」メッセージを受け取った際の処理を追加
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          // 現在のキャッシュ名以外を削除して整理する
+          if (cacheName !== CACHE_NAME) {
+            console.log('古いキャッシュを削除:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
 });
 
 self.addEventListener('fetch', (event) => {
