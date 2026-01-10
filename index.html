@@ -8,26 +8,43 @@
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f0f2f5; color: #333; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; position: relative; }
-        h2 { margin-top: 0; font-size: 1.1em; color: #2c3e50; border-bottom: 2px solid #28a745; padding-bottom: 5px; }
+        h2 { margin-top: 0; font-size: 1.1em; color: #2c3e50; border-bottom: 2px solid #28a745; padding-bottom: 5px; margin-bottom: 15px; }
         
-        label { display: block; margin-top: 10px; font-size: 0.85em; font-weight: bold; }
-        input, select { 
-            display: block; width: 100%; padding: 12px; margin: 5px 0 12px 0; 
-            border: 1px solid #ccc; border-radius: 6px; font-size: 16px; 
-            box-sizing: border-box; -webkit-appearance: none; background-color: white;
+        /* 横並びのためのスタイル */
+        .input-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .input-row label {
+            width: 110px; /* 項目名の幅を固定 */
+            font-size: 0.85em;
+            font-weight: bold;
+            margin: 0;
+            flex-shrink: 0; /* 幅を維持 */
+        }
+        .input-row input, .input-row select {
+            flex-grow: 1; /* 残りの幅をすべて使う */
+            padding: 10px;
+            margin: 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+            -webkit-appearance: none;
+            background-color: white;
+            height: 44px; /* タップしやすい高さ */
         }
         
-        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         button { 
             flex: 1; min-width: 80px; padding: 14px; font-size: 15px; border: none; 
             border-radius: 6px; cursor: pointer; color: white; font-weight: bold; 
         }
         .save-btn { background: #007bff; }
-        .update-mode { background: #fd7e14; }
         .export-btn { background: #28a745; }
         .cancel-btn { background: #6c757d; display: none; }
         
-        /* 全消去ボタンのスタイル */
         .clear-btn { 
             position: absolute; top: 18px; right: 20px; 
             background: #fff; color: #dc3545; border: 1px solid #dc3545; 
@@ -47,25 +64,48 @@
 <body>
 
 <div class="card">
-    <h2 id="formTitle">立木調査v1.0　データ入力</h2>
+    <h2 id="formTitle">立木調査v1.1</h2>
     <input type="hidden" id="editId" value="">
     
-    <label>プロット番号</label><input type="number" id="plotNo" inputmode="numeric">
-    <label>立木番号</label><input type="number" id="treeNo" inputmode="numeric">
+    <div class="input-row">
+        <label>プロット番号</label>
+        <input type="number" id="plotNo" inputmode="numeric">
+    </div>
     
-    <label>樹種</label>
-    <select id="treeType">
-        <option value="スギ">スギ</option><option value="ヒノキ">ヒノキ</option>
-        <option value="他針">他針</option><option value="他広">他広</option>
-    </select>
+    <div class="input-row">
+        <label>立木番号</label>
+        <input type="number" id="treeNo" inputmode="numeric">
+    </div>
     
-    <label>胸高直径 (cm)</label><input type="number" step="0.1" id="dbh" inputmode="decimal">
-    <label>樹高 (m)</label><input type="number" step="0.1" id="height" inputmode="decimal">
+    <div class="input-row">
+        <label>樹種</label>
+        <select id="treeType">
+            <option value="スギ">スギ</option><option value="ヒノキ">ヒノキ</option>
+            <option value="他針">他針</option><option value="他広">他広</option>
+        </select>
+    </div>
+    
+    <div class="input-row">
+        <label>胸高直径 (cm)</label>
+        <input type="number" step="0.1" id="dbh" inputmode="decimal">
+    </div>
 
-    <label>材質</label>
-    <select id="quality"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
+    <div class="input-row">
+        <label>樹高 (m)</label>
+        <input type="number" step="0.1" id="height" inputmode="decimal">
+    </div>
 
-    <label>備考</label><input type="text" id="memo">
+    <div class="input-row">
+        <label>材質</label>
+        <select id="quality">
+            <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+        </select>
+    </div>
+
+    <div class="input-row">
+        <label>備考</label>
+        <input type="text" id="memo">
+    </div>
     
     <div class="btn-group">
         <button id="saveBtn" class="save-btn" onclick="handleSave()">保存</button>
@@ -92,15 +132,12 @@
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then(reg => {
-                // 新しいService Workerのインストールを監視
                 reg.onupdatefound = () => {
                     const installingWorker = reg.installing;
                     installingWorker.onstatechange = () => {
                         if (installingWorker.state === 'installed') {
                             if (navigator.serviceWorker.controller) {
-                                // 更新がある場合に確認ダイアログを表示
                                 if (confirm("最新バージョンがあります。更新しますか？\n（更新前にCSV出力を行ってください）")) {
-                                    // sw.jsにSKIP_WAITINGを送り、即座に有効化
                                     if (reg.waiting) {
                                         reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                                     }
@@ -113,7 +150,6 @@
             }).catch(err => console.error('PWA登録失敗', err));
         });
 
-        // サービスワーカーが切り替わった時にページをリロードして反映
         let refreshing;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (refreshing) return;
@@ -213,7 +249,7 @@
         document.getElementById('dbh').value = "";
         document.getElementById('height').value = "";
         document.getElementById('memo').value = "";
-        document.getElementById('formTitle').innerText = "立木調査v1.1　データ入力";
+        document.getElementById('formTitle').innerText = "立木調査v1.2　データ入力";
         document.getElementById('saveBtn').innerText = "保存";
         document.getElementById('cancelBtn').style.display = "none";
     }
@@ -232,10 +268,7 @@
         var a = document.createElement("a");
 
         var now = new Date();
-        var yyyy = now.getFullYear();
-        var mm = String(now.getMonth() + 1).padStart(2, '0');
-        var dd = String(now.getDate()).padStart(2, '0');
-        var dateStr = yyyy + mm + dd;
+        var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
 
         a.href = url;
         a.download = "立木調査_" + dateStr + ".csv";
@@ -246,6 +279,3 @@
 </script>
 </body>
 </html>
-
-
-
